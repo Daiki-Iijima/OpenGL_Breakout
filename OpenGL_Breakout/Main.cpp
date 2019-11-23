@@ -5,6 +5,7 @@
 #include "font.h"
 #include "Rect.h"
 #include "audio.h"
+#include "Ball.h"
 
 using namespace glm;
 
@@ -13,6 +14,8 @@ ivec2 windowSize = { 800,600 };	//	ウィンドウのサイズを定義
 bool keys[256];		//	どのキーが押されているかを保持する
 
 Rect field;
+
+Ball ball = { 8 };		//	8は半径の長さ
 
 //	描画が必要になったら
 void display(void)
@@ -39,6 +42,9 @@ void display(void)
 	glColor3ub(0x00, 0x00, 0x00);	//	フィールドの色の指定
 	field.draw();					//	フィールドの描画
 
+	glColor3ub(0xff, 0xff, 0xff);	//	ボールの色を指定
+	ball.draw();
+
 	//	======= 文字列の描画(font.cpp) ======
 	fontBegin();
 	fontSetHeight(FONT_DEFAULT_HEIGHT);
@@ -57,6 +63,25 @@ void display(void)
 //	アップデートみたいなもの
 void idle(void)
 {
+	ball.update();
+
+	//	===	ボールの当たり判定 ===
+	if (
+		(ball.m_position.y >= field.m_position.y + field.m_size.y) ||
+		(ball.m_position.y < field.m_position.y))//	上下端
+	{
+		ball.m_lastposition = ball.m_position;
+		ball.m_speed.y *= -1;
+	}
+
+	if ((ball.m_position.x >= field.m_position.x + field.m_size.x) ||
+		(ball.m_position.x < field.m_position.x))//	左右端
+	{
+		ball.m_lastposition = ball.m_position;
+		ball.m_speed.x *= -1;
+	}
+	
+	//	===========================
 
 	audioUpdate();
 
@@ -76,12 +101,17 @@ void reshape(int width, int height)
 
 	float frameHeight = 16;
 	float frameSize = windowSize.y - frameHeight;	//	正方形のサイズ(y軸に合わせる)
-	
-	field.m_size = ivec2(frameSize,frameSize);		//	正方形のフィールド(四角形)のサイズを指定
+
+	field.m_size = ivec2(frameSize, frameSize);		//	正方形のフィールド(四角形)のサイズを指定
 
 	field.m_position = ivec2(			//	正方形のフィールド(四角形)の位置を指定
 		(windowSize.x - field.m_size.x) / 2,
 		frameHeight);
+
+	ball.m_lastposition =						//	ボールの初期位置
+		ball.m_position = vec2(field.m_position.x, field.m_position.y + field.m_size.y / 2);
+
+	ball.m_speed = vec2(1, 1) * 2.0f;			//	ボールのスピード
 }
 
 void keybord(unsigned char key, int x, int y)
@@ -129,7 +159,8 @@ int main(int argc, char *argv[])
 	glutKeyboardUpFunc(keybordUp);			//	キーボードが離されたときイベント
 
 	glutPassiveMotionFunc(passiveMotion);	//	マウスの移動イベントを取得
-	//glutMotionFunc(motion);				//	マウスがクリックされた状態の移動イベントを取得
+
+	reshape(windowSize.x, windowSize.y);	//	初期化のために強制的に一回呼ぶ
 
 	glutMainLoop();							//	処理をglutに委託する(コールバック系はこのメソッドより前に書く)
 
