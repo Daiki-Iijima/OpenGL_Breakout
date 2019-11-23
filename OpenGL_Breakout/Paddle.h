@@ -7,7 +7,7 @@ using namespace glm;
 
 struct Paddle
 {
-	float m_height;
+	float m_width;
 	vec2 m_position;
 
 	void draw();

@@ -6,8 +6,11 @@
 #include "Rect.h"
 #include "audio.h"
 #include "Ball.h"
+#include "Paddle.h"
 
 using namespace glm;
+
+#define PADDLE_DEFAULT_WIDTH 64
 
 ivec2 windowSize = { 800,600 };	//	ウィンドウのサイズを定義
 
@@ -16,6 +19,8 @@ bool keys[256];		//	どのキーが押されているかを保持する
 Rect field;
 
 Ball ball = { 8 };		//	8は半径の長さ
+
+Paddle paddle = { PADDLE_DEFAULT_WIDTH };
 
 //	描画が必要になったら
 void display(void)
@@ -45,6 +50,9 @@ void display(void)
 	glColor3ub(0xff, 0xff, 0xff);	//	ボールの色を指定
 	ball.draw();
 
+	glColor3ub(0x00, 0xff, 0xff);	//	パドルの色を指定
+	paddle.draw();		//	パドルの描画
+
 	//	======= 文字列の描画(font.cpp) ======
 	fontBegin();
 	fontSetHeight(FONT_DEFAULT_HEIGHT);
@@ -70,18 +78,27 @@ void idle(void)
 		(ball.m_position.y >= field.m_position.y + field.m_size.y) ||
 		(ball.m_position.y < field.m_position.y))//	上下端
 	{
-		ball.m_lastposition = ball.m_position;
+		ball.m_position = ball.m_lastposition;
 		ball.m_speed.y *= -1;
 	}
 
 	if ((ball.m_position.x >= field.m_position.x + field.m_size.x) ||
 		(ball.m_position.x < field.m_position.x))//	左右端
 	{
-		ball.m_lastposition = ball.m_position;
+		ball.m_position = ball.m_lastposition;
 		ball.m_speed.x *= -1;
 	}
-	
 	//	===========================
+
+	//	===== パドル当たり判定 =====
+
+	if (paddle.intersectBall(ball))
+	{
+		ball.m_position = ball.m_lastposition;
+		ball.m_speed.y *= -1;
+	}
+
+	//	============================
 
 	audioUpdate();
 
@@ -112,6 +129,11 @@ void reshape(int width, int height)
 		ball.m_position = vec2(field.m_position.x, field.m_position.y + field.m_size.y / 2);
 
 	ball.m_speed = vec2(1, 1) * 2.0f;			//	ボールのスピード
+
+	//	パドルの初期化
+	paddle.m_position = vec2(
+		field.m_position.x + field.m_size.x / 2,
+		field.m_position.y + field.m_size.y - 64.f);
 }
 
 void keybord(unsigned char key, int x, int y)
@@ -136,6 +158,10 @@ void keybordUp(unsigned char key, int x, int y)
 
 void passiveMotion(int _x, int _y)
 {
+	printf("passiveMotion: x%d:y%d \n", _x, _y);
+	paddle.m_position.x = _x;
+	paddle.m_position.x = max(paddle.m_position.x, field.m_position.x);
+	paddle.m_position.x = min(paddle.m_position.x, field.m_position.x + field.m_size.x - paddle.m_width);
 
 }
 
