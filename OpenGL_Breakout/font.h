@@ -11,11 +11,13 @@ void fontEnd();		//	フォント描画終了
 void fontSetPosition(float _x, float _y);		//	フォント位置
 void fontSetHeight(float _size);				//	フォントの高さを設定
 float fontGetHeight();							//	フォントの高さを取得
+float fontGetWidth();							//	フォントの幅を取得
 
-float fontGetWeightMin();					
-float fontGetWeightMax();
+float fontGetWeightMin();						//	設定できるフォントの一番細い太さ
+float fontGetWeightMax();						//	設定できるフォントの一番太い太さ
+
 void fontSetWeight(float _weight);				//	フォントの太さを変更
-float fontGetWeight();
+float fontGetWeight();							//	フォントの太さを取得
 
 
 //void fontSetColor(unsigned char _red, unsigned char _green, unsigned char _blue);	//フォントカラー

@@ -15,6 +15,8 @@ using namespace glm;
 #define BLOCK_ROW_MAX		 8			//	行
 #define BALL_X_SPEED_MAX	 8			//	ボールがパドルに当たった時のX方向の最大スピード
 
+#define FONT_HEIGHT			 32			//	フォントの高さ
+#define FONT_WEIGHT			 4			//	フォント太さ
 
 ivec2 windowSize = { 800,600 };	//	ウィンドウのサイズを定義
 
@@ -27,6 +29,9 @@ Ball ball = { 8 };		//	8は半径の長さ
 Paddle paddle = { PADDLE_DEFAULT_WIDTH };
 
 Rect blocks[BLOCK_ROW_MAX][BLOCK_COULUM_MAX];
+
+int turn = 1;
+int score;
 
 //	描画が必要になったら
 void display(void)
@@ -83,15 +88,42 @@ void display(void)
 		}
 	}
 
-	//	======= 文字列の描画(font.cpp) ======
-	fontBegin();
-	fontSetHeight(FONT_DEFAULT_HEIGHT);
 
-	float y = fontGetWeight();
-	fontSetPosition(windowSize.x / 2 + windowSize.x / 2, y);
-	fontSetWeight(fontGetWeightMax());
-	fontDraw("");
-	fontEnd();
+	//	======= 文字列の描画(font.cpp) ======
+	{
+		glColor3ub(0xff, 0xff, 0xff);	//	文字の色を指定
+
+		fontBegin();
+		{
+			fontSetHeight(FONT_HEIGHT);
+			fontSetWeight(FONT_WEIGHT);
+
+			fvec2 pos = field.m_position;
+
+			//	== 1p ==
+			fontSetPosition(pos.x, pos.y);
+			fontDraw("%d", turn);
+
+			//	== 2p ==
+			fontSetPosition(pos.x + field.m_size.x / 2, pos.y);
+			fontDraw("1");
+
+			//	== 1p ==
+			pos.y += fontGetHeight() + fontGetWeight();	//	改行した高さを計算
+			pos.x += fontGetWidth();					//	1文字分ずらす
+			fontSetPosition(pos.x, pos.y);				//	位置設定
+			{
+				static unsigned int frame;
+				if ((++frame / 15) % 2 == 0)			//	点滅処理
+					fontDraw("%03d", score);			//	スコアの描画
+			}
+
+			//	== 2p ==
+			fontSetPosition(pos.x + field.m_size.x / 2, pos.y);		//	2p用のスコア描画位置を設定
+			fontDraw("000");										//	2p用のスコアの描画
+		}
+		fontEnd();
+	}
 	//	=====================================
 
 	glutSwapBuffers();	//	ダブルバッファの表と裏を切り替える(スワップする)
@@ -151,6 +183,11 @@ void idle(void)
 
 				ball.m_position = ball.m_lastposition;		//	反射
 				ball.m_speed.y *= -1;
+
+				int colorIdx = 3 - (i / 2);					//	色のインデックスを逆に数えるために3から引く
+
+				int s = 1 + 2 * colorIdx;					//	獲得できるスコアの計算
+				score += s;
 			}
 		}
 	}
@@ -201,7 +238,7 @@ void reshape(int width, int height)
 	//	=== ブロックの初期化 ===
 	vec2 blockSize = vec2(field.m_size.x / BLOCK_COULUM_MAX, 12);
 
-	float y = field.m_position.y + 64.f;
+	float y = field.m_position.y + (FONT_HEIGHT + FONT_WEIGHT) * 2;	//	文字2行分下にずらす
 	for (int i = 0; i < BLOCK_ROW_MAX; i++)
 	{
 		for (int j = 0; j < BLOCK_COULUM_MAX; j++)

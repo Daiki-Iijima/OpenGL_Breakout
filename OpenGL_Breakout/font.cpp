@@ -65,6 +65,12 @@ float fontGetHeight()
 	return height;
 }
 
+float fontGetWidth()
+{
+	//	使用しているフォントの幅を取得して、Draw関数内でかけている倍率をかけることで1文字分の文字の横幅を算出している
+	return glutStrokeWidth(GLUT_STROKE_ROMAN,'0') * (height / FONT_DEFAULT_HEIGHT);
+}
+
 float fontGetWeightMin()
 {
 	GLfloat weight[2];
