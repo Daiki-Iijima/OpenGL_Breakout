@@ -11,12 +11,17 @@
 using namespace glm;
 
 #define PADDLE_DEFAULT_WIDTH 48			//	パドルの幅
+
+#define BLOCK_HEIGHT		 12			//	1ブロックの高さ
 #define BLOCK_COULUM_MAX	 14			//	列
 #define BLOCK_ROW_MAX		 8			//	行
+
 #define BALL_X_SPEED_MAX	 8			//	ボールがパドルに当たった時のX方向の最大スピード
 
 #define FONT_HEIGHT			 32			//	フォントの高さ
 #define FONT_WEIGHT			 4			//	フォント太さ
+
+#define SE_WAIT_MAX			 6			//	SEの最大待ち回数
 
 ivec2 windowSize = { 800,600 };	//	ウィンドウのサイズを定義
 
@@ -32,6 +37,9 @@ Rect blocks[BLOCK_ROW_MAX][BLOCK_COULUM_MAX];
 
 int turn = 1;
 int score;
+
+int seCount;
+int seWait;		//	次のSEを鳴らすまでの待機時間
 
 //	描画が必要になったら
 void display(void)
@@ -121,6 +129,19 @@ void display(void)
 			//	== 2p ==
 			fontSetPosition(pos.x + field.m_size.x / 2, pos.y);		//	2p用のスコア描画位置を設定
 			fontDraw("000");										//	2p用のスコアの描画
+
+			pos.y += fontGetHeight() + fontGetWeight();
+
+			//	デバッグ表示
+			fontSetHeight(16);
+			fontSetWeight(2);
+
+			pos.y += BLOCK_HEIGHT * BLOCK_ROW_MAX;
+			pos.x = field.m_position.x;
+			fontSetPosition(pos.x, pos.y);				//	位置設定
+			fontDraw("seCount:%d\n", seCount);
+			fontDraw("seWait:%d\n", seWait);
+
 		}
 		fontEnd();
 	}
@@ -132,6 +153,20 @@ void display(void)
 //	アップデートみたいなもの
 void idle(void)
 {
+	if (seCount > 0)
+	{
+		if (--seWait <= 0)
+		{
+			seCount--;
+			seWait = SE_WAIT_MAX;
+		
+			audioStop();
+			audioFreq(440 / 2);
+			audioPlay();
+
+		}
+	}
+
 	ball.update();
 
 	//	===	ボールの当たり判定 ===
@@ -141,6 +176,10 @@ void idle(void)
 	{
 		ball.m_position = ball.m_lastposition;
 		ball.m_speed.y *= -1;
+
+		audioStop();
+		audioFreq(440);
+		audioPlay();
 	}
 
 	if ((ball.m_position.x >= field.m_position.x + field.m_size.x) ||
@@ -148,6 +187,10 @@ void idle(void)
 	{
 		ball.m_position = ball.m_lastposition;
 		ball.m_speed.x *= -1;
+
+		audioStop();
+		audioFreq(440);
+		audioPlay();
 	}
 	//	===========================
 
@@ -164,6 +207,9 @@ void idle(void)
 
 		ball.m_speed.x = sub / subMax * BALL_X_SPEED_MAX;
 
+		audioStop();
+		audioFreq(440 * 2);
+		audioPlay();
 	}
 
 	//	============================
@@ -184,14 +230,26 @@ void idle(void)
 				ball.m_position = ball.m_lastposition;		//	反射
 				ball.m_speed.y *= -1;
 
+				audioStop();
+				audioFreq(440 / 2);
+				audioPlay();
+
 				int colorIdx = 3 - (i / 2);					//	色のインデックスを逆に数えるために3から引く
 
 				int s = 1 + 2 * colorIdx;					//	獲得できるスコアの計算
+
+				seCount += s - 1;							//	上で一回鳴らしているから1引く
+				seWait = SE_WAIT_MAX;
+
 				score += s;
+
+
+
 			}
 		}
 	}
 	//	======================================
+
 	audioUpdate();
 
 	glutPostRedisplay();	//	再描画命令
@@ -236,7 +294,7 @@ void reshape(int width, int height)
 	//	======================
 
 	//	=== ブロックの初期化 ===
-	vec2 blockSize = vec2(field.m_size.x / BLOCK_COULUM_MAX, 12);
+	vec2 blockSize = vec2(field.m_size.x / BLOCK_COULUM_MAX, BLOCK_HEIGHT);
 
 	float y = field.m_position.y + (FONT_HEIGHT + FONT_WEIGHT) * 2;	//	文字2行分下にずらす
 	for (int i = 0; i < BLOCK_ROW_MAX; i++)
@@ -284,6 +342,10 @@ void passiveMotion(int _x, int _y)
 
 int main(int argc, char *argv[])
 {
+	audioInit();
+	audioWaveform(AUDIO_WAVEFORM_PULSE_50);
+	audioDecay(.9f);
+
 	glutInit(&argc, argv);
 
 	glutInitDisplayMode(GL_DOUBLE);			//	ダブルバッファを使用する(やらない場合シングルバッファ)
