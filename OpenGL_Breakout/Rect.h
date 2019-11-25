@@ -8,6 +8,8 @@ struct Rect {
 	vec2 m_position;
 	vec2 m_size;
 
+	bool isDead;	//	Breakoutê—p‚Ì€–S”»’èƒtƒ‰ƒO
+
 	Rect();
 	Rect(vec2 const& _position, vec2 const& _size);
 	void draw();	//	•`‰æ
