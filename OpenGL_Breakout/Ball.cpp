@@ -5,13 +5,13 @@
 void Ball::update()
 {
 	m_lastposition = m_position;
-	m_position += m_speed;
+	m_position += m_speed * m_power;
 }
 void Ball::draw()
 {
 	glPushMatrix();	//	行列を保存
 	{
-		glTranslatef(m_position.x, m_position.y,0);	//	位置更新
+		glTranslatef(m_position.x, m_position.y, 0);	//	位置更新
 		glScalef(m_radius, m_radius, 0);						//	サイズを変更
 
 		glutSolidSphere(

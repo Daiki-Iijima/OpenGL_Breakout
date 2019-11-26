@@ -10,6 +10,7 @@ struct Ball
 	vec2 m_lastposition;	//	1フレーム前の位置
 	vec2 m_position;		//	現在のフレームの位置
 	vec2 m_speed;			//	速度
+	float m_power;			//	BreakOut用の変数(実際のスピード)
 
 	void update();			//	計算
 	void draw();			//	描画

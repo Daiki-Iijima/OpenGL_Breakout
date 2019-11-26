@@ -16,12 +16,22 @@ using namespace glm;
 #define BLOCK_COULUM_MAX	 14			//	列
 #define BLOCK_ROW_MAX		 8			//	行
 
-#define BALL_X_SPEED_MAX	 8			//	ボールがパドルに当たった時のX方向の最大スピード
+#define BALL_X_SPEED_MAX	 2			//	ボールがパドルに当たった時のX方向の最大スピード
 
 #define FONT_HEIGHT			 32			//	フォントの高さ
 #define FONT_WEIGHT			 4			//	フォント太さ
 
 #define SE_WAIT_MAX			 6			//	SEの最大待ち回数
+
+enum
+{
+	LEVEL_DEFAULT,
+	LEVEL_HIT_4,
+	LEVEL_HIT_12,
+	LEVEL_HIT_ORANGE,
+	LEVEL_HIT_RED,
+	LEVEL_HIT_MAX,
+};
 
 ivec2 windowSize = { 800,600 };	//	ウィンドウのサイズを定義
 
@@ -40,6 +50,34 @@ int score;
 
 int seCount;
 int seWait;		//	次のSEを鳴らすまでの待機時間
+
+int level;		//	現在のレベル
+
+float powerTbl[] =
+{
+	3,		//	LEVEL_DEFAULT
+	4,		//	LEVEL_HIT_4
+	5,		//	LEVEL_HIT_12
+	6,		//	LEVEL_HIT_ORANGE
+	7,		//	LEVEL_HIT_RED
+};
+
+//	残りのブロックの個数を数える
+int getBlockCount()
+{
+	int n = 0;
+
+	for (int i = 0; i < BLOCK_ROW_MAX; i++)
+	{
+		for (int j = 0; j < BLOCK_COULUM_MAX; j++)
+		{
+			if (!blocks[i][j].isDead)
+				n++;
+		}
+	}
+
+	return n;
+}
 
 //	描画が必要になったら
 void display(void)
@@ -73,7 +111,7 @@ void display(void)
 
 	unsigned char colors[][3] = {
 		{0xff,0x00,0x00},
-		{0x00,0x80,0x00},
+		{0xff,0x80,0x00},
 		{0x00,0xff,0x00},
 		{0xff,0xff,0x00}
 	};
@@ -141,6 +179,8 @@ void display(void)
 			fontSetPosition(pos.x, pos.y);				//	位置設定
 			fontDraw("seCount:%d\n", seCount);
 			fontDraw("seWait:%d\n", seWait);
+			fontDraw("level:%d\n", level);
+			fontDraw("blockCount:%d\n", getBlockCount());
 
 		}
 		fontEnd();
@@ -159,13 +199,17 @@ void idle(void)
 		{
 			seCount--;
 			seWait = SE_WAIT_MAX;
-		
+
 			audioStop();
 			audioFreq(440 / 2);
 			audioPlay();
 
 		}
 	}
+
+
+
+	ball.m_power = powerTbl[level];	//	ボールのレベルを設定
 
 	ball.update();
 
@@ -243,7 +287,21 @@ void idle(void)
 
 				score += s;
 
+				//	=======	レベルアップ処理 =========
+				{
+					int n = getBlockCount();
+					int blockCountMax = BLOCK_COULUM_MAX * BLOCK_ROW_MAX;
 
+					if ((n <= blockCountMax - 4) && (level < LEVEL_HIT_4))		//	4個のブロックを消していたら
+						level = LEVEL_HIT_4;
+					if ((n <= blockCountMax - 12) && (level < LEVEL_HIT_12))	//	12個のブロックを消していたら
+						level = LEVEL_HIT_12;
+					if ((colorIdx == 2) && (level < LEVEL_HIT_ORANGE))			//	オレンジ色のブロックを消していたら
+						level = LEVEL_HIT_ORANGE;
+					if ((colorIdx == 3) && (level < LEVEL_HIT_RED))				//	赤色のブロックを消していたら
+						level = LEVEL_HIT_RED;
+				}
+				//	==================================
 
 			}
 		}
@@ -283,7 +341,8 @@ void reshape(int width, int height)
 	ball.m_lastposition =						//	ボールの初期位置
 		ball.m_position = vec2(field.m_position.x, field.m_position.y + field.m_size.y / 2);
 
-	ball.m_speed = vec2(1, 1) * 4.0f;			//	ボールのスピード
+	ball.m_speed = vec2(1, 1);			//	ボールのスピード
+	ball.m_power = 1;
 
 	//	======================
 
