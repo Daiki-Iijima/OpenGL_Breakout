@@ -23,6 +23,7 @@ using namespace glm;
 
 #define SE_WAIT_MAX			 6			//	SEの最大待ち回数
 
+#define TURN_MAX			 3			//	残機数の最大値
 enum
 {
 	LEVEL_DEFAULT,
@@ -53,6 +54,10 @@ int seWait;		//	次のSEを鳴らすまでの待機時間
 
 int level;		//	現在のレベル
 
+bool started;	//	ゲームの開始フラグ
+
+int wait;		//	ゲーム開始からボールが動くまでの待機時間
+
 float powerTbl[] =
 {
 	3,		//	LEVEL_DEFAULT
@@ -79,6 +84,24 @@ int getBlockCount()
 	return n;
 }
 
+void gameOver()
+{
+	started = false;
+	paddle.m_width = field.m_size.x;			//	パドルをフィールドと同じ幅に設定
+	paddle.m_position.x = field.m_position.x;	//	位置をフィールド内に指定
+
+
+	//	===	ボール初期設定 ===
+	ball.m_lastposition.y =						//	ボールの初期位置はy座標だけ初期化
+		ball.m_position.y = field.m_position.y + field.m_size.y / 2;
+
+	ball.m_speed = vec2(1, 1);			//	ボールのスピード
+	ball.m_power = 1;
+	//	======================
+
+	level = LEVEL_DEFAULT;
+}
+
 //	描画が必要になったら
 void display(void)
 {
@@ -103,8 +126,11 @@ void display(void)
 	glColor3ub(0x00, 0x00, 0x00);	//	フィールドの色の指定
 	field.draw();					//	フィールドの描画
 
-	glColor3ub(0xff, 0xff, 0xff);	//	ボールの色を指定
-	ball.draw();
+	if (wait <= 0)
+	{
+		glColor3ub(0xff, 0xff, 0xff);	//	ボールの色を指定
+		ball.draw();
+	}
 
 	glColor3ub(0x00, 0xff, 0xff);	//	パドルの色を指定
 	paddle.draw();					//	パドルの描画
@@ -160,7 +186,9 @@ void display(void)
 			fontSetPosition(pos.x, pos.y);				//	位置設定
 			{
 				static unsigned int frame;
-				if ((++frame / 15) % 2 == 0)			//	点滅処理
+				if (started && (++frame / 10) % 2 == 0)	//	点滅処理
+					;
+				else
 					fontDraw("%03d", score);			//	スコアの描画
 			}
 
@@ -193,7 +221,7 @@ void display(void)
 //	アップデートみたいなもの
 void idle(void)
 {
-	if (seCount > 0)
+	if (started && seCount > 0)
 	{
 		if (--seWait <= 0)
 		{
@@ -206,107 +234,145 @@ void idle(void)
 
 		}
 	}
+	if (wait <= 0) {
+		ball.m_power = powerTbl[level];	//	ボールのレベルを設定
 
+		ball.update();
 
-
-	ball.m_power = powerTbl[level];	//	ボールのレベルを設定
-
-	ball.update();
-
-	//	===	ボールの当たり判定 ===
-	if (
-		(ball.m_position.y >= field.m_position.y + field.m_size.y) ||
-		(ball.m_position.y < field.m_position.y))//	上下端
-	{
-		ball.m_position = ball.m_lastposition;
-		ball.m_speed.y *= -1;
-
-		audioStop();
-		audioFreq(440);
-		audioPlay();
-	}
-
-	if ((ball.m_position.x >= field.m_position.x + field.m_size.x) ||
-		(ball.m_position.x < field.m_position.x))//	左右端
-	{
-		ball.m_position = ball.m_lastposition;
-		ball.m_speed.x *= -1;
-
-		audioStop();
-		audioFreq(440);
-		audioPlay();
-	}
-	//	===========================
-
-	//	===== パドル当たり判定 =====
-
-	if (paddle.intersectBall(ball))
-	{
-		ball.m_position = ball.m_lastposition;
-		ball.m_speed.y *= -1;
-
-		float paddleCenterX = paddle.m_position.x + paddle.m_width / 2;
-		float sub = ball.m_position.x - paddleCenterX;
-		float subMax = paddle.m_width / 2;
-
-		ball.m_speed.x = sub / subMax * BALL_X_SPEED_MAX;
-
-		audioStop();
-		audioFreq(440 * 2);
-		audioPlay();
-	}
-
-	//	============================
-
-
-	//	======= ブロックの当たり判定 =========
-	for (int i = 0; i < BLOCK_ROW_MAX; i++)
-	{
-		for (int j = 0; j < BLOCK_COULUM_MAX; j++)
+		//	===	ボールの当たり判定 ===
+		if ((ball.m_position.y < field.m_position.y))//	上端
 		{
-			if (blocks[i][j].isDead)						//	死亡フラグが立っていたら抜ける
-				continue;
+			ball.m_position = ball.m_lastposition;
+			ball.m_speed.y *= -1;
 
-			if (blocks[i][j].intersect(ball.m_position))	//	ボールトの当たり判定
+			if (started)
 			{
-				blocks[i][j].isDead = true;					//	当たったブロックを表示しないように死亡フラグを立てる
-
-				ball.m_position = ball.m_lastposition;		//	反射
-				ball.m_speed.y *= -1;
-
 				audioStop();
-				audioFreq(440 / 2);
+				audioFreq(440);
 				audioPlay();
-
-				int colorIdx = 3 - (i / 2);					//	色のインデックスを逆に数えるために3から引く
-
-				int s = 1 + 2 * colorIdx;					//	獲得できるスコアの計算
-
-				seCount += s - 1;							//	上で一回鳴らしているから1引く
-				seWait = SE_WAIT_MAX;
-
-				score += s;
-
-				//	=======	レベルアップ処理 =========
-				{
-					int n = getBlockCount();
-					int blockCountMax = BLOCK_COULUM_MAX * BLOCK_ROW_MAX;
-
-					if ((n <= blockCountMax - 4) && (level < LEVEL_HIT_4))		//	4個のブロックを消していたら
-						level = LEVEL_HIT_4;
-					if ((n <= blockCountMax - 12) && (level < LEVEL_HIT_12))	//	12個のブロックを消していたら
-						level = LEVEL_HIT_12;
-					if ((colorIdx == 2) && (level < LEVEL_HIT_ORANGE))			//	オレンジ色のブロックを消していたら
-						level = LEVEL_HIT_ORANGE;
-					if ((colorIdx == 3) && (level < LEVEL_HIT_RED))				//	赤色のブロックを消していたら
-						level = LEVEL_HIT_RED;
-				}
-				//	==================================
-
 			}
 		}
+
+		if (ball.m_position.y >= field.m_position.y + field.m_size.y)	//	下端(1機失ったとき)
+		{
+			turn++;
+			wait = 60 * 3;
+
+			level = LEVEL_DEFAULT;
+
+			//	===	ボール初期設定 ===
+			ball.m_lastposition.y =						//	ボールの初期位置はy座標だけ初期化
+				ball.m_position.y = field.m_position.y + field.m_size.y / 2;
+
+			ball.m_speed = vec2(1, 1);					//	ボールのスピード
+			ball.m_power = 1;
+			//	======================
+		}
+
+		if ((ball.m_position.x >= field.m_position.x + field.m_size.x) ||
+			(ball.m_position.x < field.m_position.x))//	左右端
+		{
+			ball.m_position = ball.m_lastposition;
+			ball.m_speed.x *= -1;
+
+			if (started)
+			{
+				audioStop();
+				audioFreq(440);
+				audioPlay();
+			}
+		}
+		//	===========================
+
+		//	===== パドル当たり判定 =====
+
+		if (paddle.intersectBall(ball))
+		{
+			ball.m_position = ball.m_lastposition;
+			ball.m_speed.y *= -1;
+
+			if (started)
+			{
+				//	=== ボールの反射角度変化 ===
+				float paddleCenterX = paddle.m_position.x + paddle.m_width / 2;
+				float sub = ball.m_position.x - paddleCenterX;
+				float subMax = paddle.m_width / 2;
+				ball.m_speed.x = sub / subMax * BALL_X_SPEED_MAX;
+				//	============================
+
+				audioStop();
+				audioFreq(440 * 2);
+				audioPlay();
+			}
+		}
+
+		//	============================
+
+
+		//	======= ブロックの当たり判定 =========
+		for (int i = 0; i < BLOCK_ROW_MAX; i++)
+		{
+			for (int j = 0; j < BLOCK_COULUM_MAX; j++)
+			{
+				if (blocks[i][j].isDead)						//	死亡フラグが立っていたら抜ける
+					continue;
+
+				if (blocks[i][j].intersect(ball.m_position))	//	ボールトの当たり判定
+				{
+					if (started)
+					{
+						blocks[i][j].isDead = true;					//	当たったブロックを表示しないように死亡フラグを立てる
+
+						audioStop();
+						audioFreq(440 / 2);
+						audioPlay();
+
+						//	==== スコア計算 ====
+
+						int colorIdx = 3 - (i / 2);					//	色のインデックスを逆に数えるために3から引く
+
+						int s = 1 + 2 * colorIdx;					//	獲得できるスコアの計算
+
+						seCount += s - 1;							//	上で一回鳴らしているから1引く
+						seWait = SE_WAIT_MAX;
+
+						score += s;
+
+						//	====================
+
+						//	=======	レベルアップ処理 =========
+						{
+							int n = getBlockCount();
+							int blockCountMax = BLOCK_COULUM_MAX * BLOCK_ROW_MAX;
+
+							if ((n <= blockCountMax - 4) && (level < LEVEL_HIT_4))		//	4個のブロックを消していたら
+								level = LEVEL_HIT_4;
+							if ((n <= blockCountMax - 12) && (level < LEVEL_HIT_12))	//	12個のブロックを消していたら
+								level = LEVEL_HIT_12;
+							if ((colorIdx == 2) && (level < LEVEL_HIT_ORANGE))			//	オレンジ色のブロックを消していたら
+								level = LEVEL_HIT_ORANGE;
+							if ((colorIdx == 3) && (level < LEVEL_HIT_RED))				//	赤色のブロックを消していたら
+								level = LEVEL_HIT_RED;
+						}
+						//	==================================
+					}
+
+					ball.m_position = ball.m_lastposition;		//	反射
+					ball.m_speed.y *= -1;
+				}
+			}
+		}
+		//	======================================
 	}
-	//	======================================
+	else
+	{
+		wait--;
+		if (wait <= 0)
+		{
+			if (turn > TURN_MAX)		//	ゲームオーバー
+				gameOver();
+		}
+	}
 
 	audioUpdate();
 
@@ -399,6 +465,38 @@ void passiveMotion(int _x, int _y)
 	// =========================================
 }
 
+void mouse(int button, int state, int x, int y)
+{
+	if ((!started) && (state == GLUT_DOWN))
+	{
+		//	===	ボール初期設定 ===
+		ball.m_lastposition.y =						//	ボールの初期位置はy座標だけ初期化
+			ball.m_position.y = field.m_position.y + field.m_size.y / 2;
+
+		ball.m_speed = vec2(1, 1);					//	ボールのスピード
+		ball.m_power = 1;
+		//	======================
+
+		started = true;
+
+		for (int i = 0; i < BLOCK_ROW_MAX; i++)
+		{
+			for (int j = 0; j < BLOCK_COULUM_MAX; j++)
+			{
+				blocks[i][j].isDead = false;
+			}
+		}
+
+		turn = 1;
+		score = 0;
+
+		level = LEVEL_DEFAULT;
+		paddle.m_width = PADDLE_DEFAULT_WIDTH;
+
+		wait = 60.f * 3;		//	待機時間を設定
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	audioInit();
@@ -423,8 +521,10 @@ int main(int argc, char *argv[])
 	glutKeyboardUpFunc(keybordUp);			//	キーボードが離されたときイベント
 
 	glutPassiveMotionFunc(passiveMotion);	//	マウスの移動イベントを取得
-
+	glutMouseFunc(mouse);						//	マウスのクリックイベントを取得
 	reshape(windowSize.x, windowSize.y);	//	初期化のために強制的に一回呼ぶ
+
+	gameOver();								//	最初はデモ画面(ゲームオーバー画面)
 
 	glutMainLoop();							//	処理をglutに委託する(コールバック系はこのメソッドより前に書く)
 
