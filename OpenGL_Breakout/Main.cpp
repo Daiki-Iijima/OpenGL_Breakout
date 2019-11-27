@@ -24,6 +24,8 @@ using namespace glm;
 #define SE_WAIT_MAX			 6			//	SEの最大待ち回数
 
 #define TURN_MAX			 3			//	残機数の最大値
+
+#define SCREEN_MAX			 2			//	最大面数
 enum
 {
 	LEVEL_DEFAULT,
@@ -57,6 +59,8 @@ int level;		//	現在のレベル
 bool started;	//	ゲームの開始フラグ
 
 int wait;		//	ゲーム開始からボールが動くまでの待機時間
+
+int screen;		//	現在何面か
 
 float powerTbl[] =
 {
@@ -209,6 +213,7 @@ void display(void)
 			fontDraw("seWait:%d\n", seWait);
 			fontDraw("level:%d\n", level);
 			fontDraw("blockCount:%d\n", getBlockCount());
+			fontDraw("screen:%d\n", screen);
 
 		}
 		fontEnd();
@@ -293,6 +298,19 @@ void idle(void)
 
 			if (started)
 			{
+				if ((getBlockCount() <= 0) && (screen < SCREEN_MAX - 1))	//	最初のステージをクリアした場合のみ
+				{
+					screen++;		//	面数をインクリメント
+
+					for (int i = 0; i < BLOCK_ROW_MAX; i++)
+					{
+						for (int j = 0; j < BLOCK_COULUM_MAX; j++)
+						{
+							blocks[i][j].isDead = true;		//	ブロックが復活する
+						}
+					}
+				}
+
 				//	=== ボールの反射角度変化 ===
 				float paddleCenterX = paddle.m_position.x + paddle.m_width / 2;
 				float sub = ball.m_position.x - paddleCenterX;
@@ -459,7 +477,7 @@ void passiveMotion(int _x, int _y)
 	printf("passiveMotion: x%d:y%d \n", _x, _y);
 
 	//	===	パドルをマウスで操作できるように ===
-	paddle.m_position.x = _x;
+	paddle.m_position.x = _x - paddle.m_width / 2;	//	マウスカーソルをパドルの中心に来るように
 	paddle.m_position.x = max(paddle.m_position.x, field.m_position.x);
 	paddle.m_position.x = min(paddle.m_position.x, field.m_position.x + field.m_size.x - paddle.m_width);
 	// =========================================
@@ -489,7 +507,7 @@ void mouse(int button, int state, int x, int y)
 
 		turn = 1;
 		score = 0;
-
+		screen = 0;
 		level = LEVEL_DEFAULT;
 		paddle.m_width = PADDLE_DEFAULT_WIDTH;
 
